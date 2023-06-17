@@ -1,0 +1,59 @@
+ext {
+    isReleaseSnapshotVersion = { version ->
+        return version.endsWith('-SNAPSHOT')
+    }
+
+    getVcsVersion = {
+        return ext.grgit.describe()
+    }
+
+    composeReleaseVersion = {
+        def branchName = grgit.branch.current().name
+        def currentVersion = grgit.describe()
+
+        if (branchName == 'main' || currentVersion == project.version) {
+            return project.version
+        }
+        else if (isReleaseSnapshotVersion(currentVersion)) { // no further commits
+            return currentVersion
+        }
+        else {
+            return [project.version, currentVersion.split('-').getAt(-1), 'SNAPSHOT'].join('-')
+        }
+    }
+
+}
+
+task tagVersion {
+    group 'release'
+    description = 'Tags the current head with the project\'s version.'
+
+    doLast {
+        def version = project.ext.composeReleaseVersion()
+        if (grgit.tag.list().any {it.fullName.endsWith(version)}) {
+            throw new IllegalArgumentException("Error: tag exists '$version'")
+        }
+
+        grgit.tag.add {
+            name = version
+            force = true
+            annotate = true
+            message = "Release of v${version}"
+        }
+
+        project.logger.lifecycle("Successfully released v${version}")
+    }
+}
+
+task commitVersion {
+    group 'release'
+    description = 'Commit the changes in build.gradle.kts with the version changes'
+
+    doLast {
+        def version = project.version
+        grgit.add(patterns: ['build.gradle.kts'])
+        grgit.commit(message: "Updated the version to v${version}")
+
+        project.logger.lifecycle("Successfully commit the version as v${version}")
+    }
+}

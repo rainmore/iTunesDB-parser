@@ -1,0 +1,13 @@
+test {
+    // force run task all the time
+    outputs.upToDateWhen { false }
+    dependsOn 'cleanTest'
+
+    // Fail the 'test' task on the first test failure
+    failFast = true
+
+    // Show test results.
+    testLogging {
+        events 'skipped', 'failed'
+    }
+}
